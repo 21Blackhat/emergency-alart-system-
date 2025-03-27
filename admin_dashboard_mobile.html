@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Admin Dashboard | Emergency Alert System</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#007bff">
+
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+        .navbar {
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+        .container {
+            margin-top: 80px;
+        }
+        .status-pending {
+            color: red;
+            font-weight: bold;
+        }
+        .status-resolved {
+            color: green;
+            font-weight: bold;
+        }
+        .alert {
+            display: none;
+        }
+    </style>
+</head>
+<script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js')
+            .then(() => console.log("Service Worker Registered"))
+            .catch((error) => console.log("Service Worker Registration Failed", error));
+    }
+</script>
+
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-dark bg-primary p-2">
+        <div class="container-fluid">
+            <a class="navbar-brand">📢 Emergency Admin Panel</a>
+            <button class="btn btn-danger" onclick="logout()">🔓 Logout</button>
+        </div>
+    </nav>
+
+    <!-- Notification Alert -->
+    <div class="container mt-3">
+        <div id="alertBox" class="alert alert-danger text-center"></div>
+    </div>
+
+    <!-- Emergency Reports List -->
+    <div class="container mt-3">
+        <h4 class="text-center">🚨 Emergency Reports</h4>
+        <div class="list-group" id="adminReportList"></div>
+    </div>
+    <div class="container mt-3">
+        <h4 class="text-center">📊 Generate Emergency Reports</h4>
+        <div class="d-flex justify-content-center">
+            <a href="generate_report.php?format=pdf" class="btn btn-danger me-2">📄 Download PDF</a>
+            <a href="generate_report.php?format=csv" class="btn btn-success">📑 Download CSV</a>
+        </div>
+    </div>
+    
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetchReports();
+
+            // Connect to WebSocket Server
+            const socket = new WebSocket("ws://localhost:8080");
+
+            socket.onmessage = function (event) {
+                const emergency = JSON.parse(event.data);
+                showNotification(emergency.message, emergency.location, emergency.user_name);
+                fetchReports();
+            };
+        });
+
+        function fetchReports() {
+            fetch("fetch_reports.php")
+                .then(response => response.json())
+                .then(data => {
+                    let reportList = document.getElementById("adminReportList");
+                    reportList.innerHTML = "";
+
+                    data.forEach(report => {
+                        let statusClass = report.status === "Pending" ? "status-pending" : "status-resolved";
+                        let mapLink = generateGoogleMapsLink(report.location);
+                        let statusButton = (report.status === "Pending")
+                            ? `<button class="btn btn-success btn-sm" onclick="updateStatus(${report.id})">✅ Resolve</button>`
+                            : `<span class="badge bg-success">Resolved</span>`;
+
+                        let listItem = `
+                            <a href="${mapLink}" target="_blank" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${report.user_name}</strong><br>
+                                    <small>${report.location}</small><br>
+                                    <span class="${statusClass}">${report.status}</span>
+                                </div>
+                                ${statusButton}
+                            </a>`;
+                        reportList.innerHTML += listItem;
+                    });
+                })
+                .catch(error => console.error("Error fetching reports:", error));
+        }
+
+        function generateGoogleMapsLink(location) {
+            let coords = location.match(/Lat: ([\d.]+), Long: ([\d.]+)/);
+            return coords ? `https://www.google.com/maps?q=${coords[1]},${coords[2]}` : "#";
+        }
+
+        function updateStatus(reportId) {
+            fetch("update_status.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: reportId })
+            })
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                fetchReports();
+            });
+        }
+
+        function showNotification(message, location, user) {
+            let alertBox = document.getElementById("alertBox");
+            alertBox.innerHTML = `<strong>${message}</strong> - ${user} reported an emergency at <a href="https://www.google.com/maps?q=${location}" target="_blank">${location}</a>`;
+            alertBox.style.display = "block";
+        }
+
+        function logout() {
+            fetch('logout.php')
+                .then(() => {
+                    window.location.href = "login.html";
+                });
+        }
+    </script>
+
+</body>
+</html>

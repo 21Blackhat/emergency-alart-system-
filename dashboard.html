@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Emergency Alert System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <span class="navbar-brand">Emergency Alert System</span>
+            <button class="btn btn-danger" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container mt-5 text-center">
+        <h2>Welcome, <span id="username"></span>!</h2>
+        <button class="btn btn-danger my-3" onclick="reportEmergency()">🚨 Report Emergency</button>
+        <button class="btn btn-secondary" onclick="viewReports()">📋 View Reports</button>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch('session.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.logged_in) {
+                        document.getElementById("username").innerText = data.username;
+                    } else {
+                        window.location.href = "login.html";
+                    }
+                });
+        });
+
+        function reportEmergency() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        let location = `Lat: ${position.coords.latitude}, Long: ${position.coords.longitude}`;
+                        sendEmergencyReport(location);
+                    },
+                    function (error) {
+                        alert("Error getting location: " + error.message);
+                    }
+                );
+            } else {
+                alert("Geolocation is not supported by your browser.");
+            }
+        }
+
+        function sendEmergencyReport(location) {
+            fetch("report.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ location: location })
+            })
+            .then(response => response.text())
+            .then(data => alert(data));
+        }
+
+        function viewReports() {
+            window.location.href = "reports.html";
+        }
+
+        function logout() {
+            fetch('logout.php')
+                .then(() => {
+                    window.location.href = "login.html";
+                });
+        }
+    </script>
+</body>
+</html>
